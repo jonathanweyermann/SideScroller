@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f7f4ea">
+  <title>Stickman Sprint</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="game.js" defer></script>
+</head>
+<body>
+  <main class="page">
+    <header class="site-header">
+      <div class="brand"><span class="brand-mark" aria-hidden="true">●</span> STICKMAN SPRINT</div>
+      <span class="edition">01 / SIDE SCROLLER</span>
+    </header>
+    <section class="game-shell" aria-label="Stickman Sprint game">
+      <div class="game-topline">
+        <span class="live-label"><span class="live-dot" aria-hidden="true"></span> FREE RUN</span>
+        <div class="scores"><span>BEST <strong id="best-score">00000</strong></span><span>SCORE <strong id="score">00000</strong></span></div>
+      </div>
+      <div class="stage" id="stage">
+        <canvas id="game-canvas" aria-label="Stickman jumping over obstacles"></canvas>
+        <div class="overlay" id="overlay">
+          <div class="overlay-card">
+            <span class="eyebrow" id="overlay-eyebrow">READY WHEN YOU ARE</span>
+            <h1 id="overlay-title">Move. Jump.<br><em>Explore.</em></h1>
+            <p id="overlay-description">Move with the arrow keys. Jump over obstacles.</p>
+            <button class="primary-button" id="start-button" type="button">START RUN <span aria-hidden="true">↗</span></button>
+            <span class="overlay-hint">← → MOVE &nbsp; / &nbsp; ↑ JUMP</span>
+          </div>
+        </div>
+      </div>
+      <div class="game-bottomline">
+        <span class="controls-copy"><span class="keycap">←</span> <span class="keycap">→</span> MOVE <span class="divider">/</span> <span class="keycap">↑</span> JUMP <span class="divider">/</span> <span class="keycap">P</span> PAUSE</span>
+        <div class="touch-controls" aria-label="Touch game controls">
+          <button class="control-button" id="left-button" type="button" aria-label="Move left">←</button>
+          <button class="control-button" id="right-button" type="button" aria-label="Move right">→</button>
+          <button class="control-button jump-button" id="jump-button" type="button" aria-label="Jump">↑</button>
+        </div>
+        <span class="version">V 1.1</span>
+      </div>
+    </section>
+    <footer class="page-footer"><span>ONE MORE RUN?</span><span>BUILT FOR QUICK BREAKS.</span></footer>
+  </main>
+</body>
+</html>

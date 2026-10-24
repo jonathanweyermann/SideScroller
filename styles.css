@@ -1,5 +1,6 @@
 :root{color-scheme:light;--paper:#f7f4ea;--ink:#1e2523;--muted:#727a73;--line:#d9ddd3;--pale:#e9eadf;--accent:#ef7144;font-family:Arial,Helvetica,sans-serif}
 *{box-sizing:border-box}
+#score{font-size:clamp(24px,4vw,32px);font-variant-numeric:tabular-nums}
 body{min-width:290px;min-height:100vh;margin:0;background:var(--paper);color:var(--ink)}
 button{font:inherit;cursor:pointer}
 .page{width:min(1120px,calc(100% - 48px));min-height:100vh;margin:0 auto;display:flex;flex-direction:column}

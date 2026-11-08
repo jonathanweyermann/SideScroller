@@ -397,7 +397,10 @@
       button.addEventListener(type, () => { input[direction] = false; });
     }
   }
-  document.querySelector('#jump-button').addEventListener('click', jump);
+  document.querySelector('#jump-button').addEventListener('pointerdown', event => {
+    event.preventDefault();
+    jump();
+  });
   startButton.addEventListener('click', start);
   document.addEventListener('visibilitychange', () => { if (document.hidden && state === 'running') pause(); });
   window.addEventListener('blur', () => { input.left = false; input.right = false; if (state === 'running') pause(); });

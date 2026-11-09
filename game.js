@@ -479,6 +479,7 @@
 
   const speedLevels = { easy: .7, medium: .85, hard: 1 };
   function setLevelButtonsLocked(locked) {
+    document.querySelector('.difficulty-controls').hidden = locked;
     for (const level of Object.keys(speedLevels)) {
       const button = document.querySelector(`#speed-${level}`);
       button.disabled = locked;

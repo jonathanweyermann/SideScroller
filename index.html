@@ -4,30 +4,37 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#f7f4ea">
-  <title>Stickman Sprint</title>
+  <title>Rainbow Run</title>
   <link rel="stylesheet" href="styles.css?v=2">
   <script src="game.js?v=2" defer></script>
 </head>
 <body>
   <main class="page">
     <header class="site-header">
-      <div class="brand"><span class="brand-mark" aria-hidden="true">●</span> STICKMAN SPRINT</div>
+      <div class="brand"><span class="brand-mark" aria-hidden="true">●</span> RAINBOW RUN</div>
       <span class="edition">01 / SIDE SCROLLER</span>
     </header>
-    <section class="game-shell" aria-label="Stickman Sprint game">
+    <section class="game-shell" aria-label="Rainbow Run game">
       <div class="game-topline">
-        <span class="live-label"><span class="live-dot" aria-hidden="true"></span> FREE RUN</span>
+        <span class="lives" id="lives" role="img" aria-label="3 lives remaining"><span aria-hidden="true">♥ ♥ ♥</span></span>
         <div class="scores"><span>BEST <strong id="best-score">00000</strong></span><span>SCORE <strong id="score">00000</strong></span></div>
+      </div>
+      <div class="difficulty-controls" role="group" aria-label="Speed level">
+        <span>SPEED LEVEL</span>
+        <button type="button" id="speed-easy" aria-pressed="false">Easy <small>70%</small></button>
+        <button type="button" id="speed-medium" aria-pressed="true">Medium <small>85%</small></button>
+        <button type="button" id="speed-hard" aria-pressed="false">Hard <small>100%</small></button>
       </div>
       <div class="stage" id="stage">
         <canvas id="game-canvas" aria-label="Stickman jumping over obstacles and patrolling enemies"></canvas>
+        <div id="countdown" class="countdown" hidden role="status" aria-live="polite"></div>
         <div class="overlay" id="overlay">
           <div class="overlay-card">
             <span class="eyebrow" id="overlay-eyebrow">READY WHEN YOU ARE</span>
             <h1 id="overlay-title">Move. Jump.<br><em>Explore.</em></h1>
-            <p id="overlay-description">Move with the arrow keys. Jump over obstacles and red enemies. Touching either ends your run.</p>
+            <p id="overlay-description">Run right automatically! Jump twice to reach ledges. Stomp monsters and collect coins. You have three lives!</p>
             <button class="primary-button" id="start-button" type="button">START RUN <span aria-hidden="true">↗</span></button>
-            <span class="overlay-hint">← → MOVE &nbsp; / &nbsp; ↑ JUMP</span>
+            <span class="overlay-hint">↑ / SPACE JUMP &nbsp; / &nbsp; P PAUSE</span>
           </div>
         </div>
       </div>
@@ -35,7 +42,7 @@
         <span class="controls-copy"><span class="keycap">←</span> <span class="keycap">→</span> MOVE <span class="divider">/</span> <span class="keycap">↑</span> JUMP <span class="divider">/</span> <span class="keycap">P</span> PAUSE</span>
         <div class="touch-controls" aria-label="Touch game controls">
           <div class="move-pad">
-            <button class="control-button" id="left-button" type="button" aria-label="Move left">←</button>
+            <button class="control-button" id="left-button" type="button" aria-label="Move left unavailable" disabled>←</button>
             <button class="control-button" id="right-button" type="button" aria-label="Move right">→</button>
           </div>
           <button class="control-button jump-button" id="jump-button" type="button" aria-label="Jump">↑</button>

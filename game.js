@@ -11,6 +11,8 @@
   const startButton = document.querySelector('#start-button');
   const scoreDisplay = document.querySelector('#score');
   const bestDisplay = document.querySelector('#best-score');
+  const livesDisplay = document.querySelector('#lives');
+  const countdownDisplay = document.querySelector('#countdown');
   const colors = { ink: '#1e2523', accent: '#ef7144', line: '#d9ddd3', pale: '#e9eadf' };
   const config = { gravity: 2100, jumpVelocity: -750, moveSpeed: 320, startX: 105, playerWidth: 24, playerHeight: 58 };
 
@@ -18,6 +20,12 @@
   let height = 0;
   let groundY = 0;
   let state = 'ready';
+  let speedMultiplier = .85;
+  let selectedLevel = 'medium';
+  let runLevel = 'medium';
+  let lives = 3;
+  let countdown = 0;
+  let invulnerable = 0;
   let lastFrame = 0;
   let cameraX = 0;
   let maxProgress = 0;
@@ -34,18 +42,55 @@
   let clouds = [];
   let player = { x: config.startX, y: 0, velocity: 0, grounded: true, airJumpUsed: false, runTime: 0 };
   const input = { left: false, right: false };
-  let best = loadBest();
+  const bestScores = { easy: loadBest('easy'), medium: loadBest('medium'), hard: loadBest('hard') };
+  // Apply this requested score once so future Hard records can still increase.
+  try {
+    if (localStorage.getItem('rainbow-run-hard-5250-applied') !== 'true') {
+      bestScores.hard = 5250;
+      localStorage.setItem('stickman-sprint-best-hard', '5250');
+      localStorage.setItem('rainbow-run-hard-5250-applied', 'true');
+    }
+  } catch { bestScores.hard = Math.max(bestScores.hard, 5250); }
 
-  function loadBest() {
-    try { return Number(localStorage.getItem('stickman-sprint-best')) || 0; }
+  function loadBest(level) {
+    try {
+      const value = Number(localStorage.getItem(`stickman-sprint-best-${level}`));
+      return Number.isFinite(value) && value > 0 ? Math.floor(value) : 0;
+    }
     catch { return 0; }
   }
-  function saveBest() {
-    try { localStorage.setItem('stickman-sprint-best', String(best)); }
+  function saveBest(level) {
+    try { localStorage.setItem(`stickman-sprint-best-${level}`, String(bestScores[level])); }
     catch { /* Storage is optional. */ }
+  }
+  function showBest() {
+    bestDisplay.textContent = formatScore(bestScores[selectedLevel]);
+    bestDisplay.setAttribute('aria-label', `${selectedLevel} best score: ${bestScores[selectedLevel]}`);
   }
   function formatScore(value) { return String(Math.floor(value)).padStart(5, '0'); }
   function currentScore() { return Math.floor(maxProgress / 10) + enemyBonus + coinBonus; }
+  function showLives() {
+    livesDisplay.innerHTML = `<span aria-hidden="true">${'♥ '.repeat(lives).trim()}</span>`;
+    livesDisplay.setAttribute('aria-label', `${lives} ${lives === 1 ? 'life' : 'lives'} remaining`);
+  }
+  function showCountdown() {
+    countdownDisplay.innerHTML = `Get ready!<strong>${Math.ceil(countdown)}</strong>`;
+  }
+  function beginCountdown() {
+    state = 'countdown';
+    countdown = 3;
+    countdownDisplay.hidden = false;
+    showCountdown();
+  }
+  function loseLife() {
+    if (state !== 'running' || invulnerable > 0) return;
+    lives--;
+    showLives();
+    input.left = false;
+    input.right = false;
+    if (lives === 0) { endRun(); return; }
+    beginCountdown();
+  }
 
   function resize() {
     const rect = stage.getBoundingClientRect();
@@ -61,6 +106,12 @@
   }
 
   function reset() {
+    runLevel = selectedLevel;
+    lives = 3;
+    countdown = 0;
+    invulnerable = 0;
+    countdownDisplay.hidden = true;
+    showLives();
     cameraX = 0;
     maxProgress = 0;
     enemyBonus = 0;
@@ -91,9 +142,15 @@
     }
   }
   function start() {
-    if (state !== 'paused') { reset(); input.left = false; input.right = false; }
-    state = 'running';
+    if (state === 'countdown') return;
+    if (state !== 'paused') {
+      reset(); input.left = false; input.right = false;
+      beginCountdown();
+    } else {
+      state = 'running';
+    }
     overlay.classList.add('is-hidden');
+    setLevelButtonsLocked(true);
     lastFrame = performance.now();
   }
   function jump() {
@@ -102,7 +159,9 @@
     if (player.grounded) {
       player.velocity = config.jumpVelocity;
     } else {
-      player.velocity = -450;
+      // Preserve upward momentum so a quick second press still adds height.
+      const upwardSpeed = Math.min(0, player.velocity);
+      player.velocity = -Math.hypot(upwardSpeed, 450);
       player.airJumpUsed = true;
     }
     player.grounded = false;
@@ -125,27 +184,58 @@
     nextObstacleX += 370 + Math.random() * 140;
   }
   function collision(obstacle) {
+    // A monster on a ledge cannot hurt a player approaching from underneath.
+    // Only enable its damage once the player's feet reach the ledge surface.
+    if (obstacle.baseHeight > 0 && player.y > -obstacle.baseHeight) return false;
     const px = player.x + 4;
-    const py = groundY - config.playerHeight + player.y + 7;
+    // Ledge monsters only hurt the body; brushing them with the head is safe.
+    const hitboxHeight = obstacle.baseHeight > 0 ? 40 : config.playerHeight - 7;
+    const py = groundY + player.y - hitboxHeight;
     const pw = config.playerWidth - 8;
-    const ph = config.playerHeight - 10;
+    const ph = hitboxHeight - 3;
     const baseY = groundY - (obstacle.baseHeight || 0);
     return px < obstacle.x + obstacle.width - 3 && px + pw > obstacle.x + 3 && py < baseY - 4 && py + ph > baseY - obstacle.height + 5;
   }
+  function spawnLedge(ledge, monsterChance) {
+    ledges.push(ledge);
+    if (Math.random() < monsterChance) {
+      const left = ledge.x + 10;
+      const right = ledge.x + ledge.width - 30;
+      enemies.push({ x: left, width: 20, height: 28, baseHeight: ledge.height, left, right, direction: 1, speed: (65 + Math.random() * 25) * .75, walkTime: 0 });
+    }
+    if (Math.random() < .5) {
+      coins.push({ x: ledge.x + ledge.width / 2, y: -ledge.height - 34 });
+    }
+  }
   function endRun() {
     state = 'over';
+    setLevelButtonsLocked(false);
     input.left = false;
     input.right = false;
     const score = currentScore();
-    if (score > best) { best = score; bestDisplay.textContent = formatScore(best); saveBest(); }
+    if (score > bestScores[runLevel]) { bestScores[runLevel] = score; saveBest(runLevel); }
+    showBest();
     showOverlay('over');
   }
   function update(dt) {
+    if (state === 'countdown') {
+      if (document.hidden) return;
+      countdown = Math.max(0, countdown - dt);
+      if (countdown > 0) showCountdown();
+      else {
+        state = 'running';
+        countdownDisplay.hidden = true;
+        invulnerable = lives < 3 ? 2 : 0;
+      }
+      return;
+    }
     if (state !== 'running') return;
-    const direction = Number(input.right) - Number(input.left);
+    invulnerable = Math.max(0, invulnerable - dt);
+    player.colorTime = (player.colorTime || 0) + dt;
+    const direction = 1;
     const previousX = player.x;
     const previousY = player.y;
-    player.x = Math.max(0, player.x + direction * config.moveSpeed * dt);
+    player.x = Math.max(0, player.x + direction * config.moveSpeed * speedMultiplier * dt);
     // Solid box sides stop horizontal movement without hurting the player.
     for (const obstacle of obstacles) {
       if (previousY <= -obstacle.height) continue;
@@ -164,12 +254,8 @@
     while (nextObstacleX < cameraX + width + 240) spawnObstacle();
     while (nextLedgeX < cameraX + width + 240) {
       const ledge = { x: nextLedgeX, width: 180 + Math.random() * 60, height: 145 + Math.random() * 10 };
-      ledges.push(ledge);
-      if (Math.random() < .45) {
-        const left = ledge.x + 10;
-        const right = ledge.x + ledge.width - 30;
-        enemies.push({ x: left, width: 20, height: 28, baseHeight: ledge.height, left, right, direction: 1, speed: (65 + Math.random() * 25) * .75, walkTime: 0 });
-      }
+      spawnLedge(ledge, .45 * .85);
+      spawnLedge({ x: ledge.x + ledge.width * .55, width: 150 + Math.random() * 40, height: ledge.height + 110, upper: true }, .35 * .85);
       nextLedgeX += 450 + Math.random() * 200;
     }
     while (nextCoinX < cameraX + width + 240) {
@@ -202,8 +288,8 @@
       if (player.y >= 0) { player.y = 0; player.velocity = 0; player.grounded = true; player.airJumpUsed = false; }
     }
     for (const enemy of enemies) {
-      enemy.x += enemy.direction * enemy.speed * dt;
-      enemy.walkTime += dt;
+      enemy.x += enemy.direction * enemy.speed * speedMultiplier * dt;
+      enemy.walkTime += dt * speedMultiplier;
       if (enemy.x >= enemy.right) { enemy.x = enemy.right; enemy.direction = -1; }
       else if (enemy.x <= enemy.left) { enemy.x = enemy.left; enemy.direction = 1; }
     }
@@ -217,7 +303,7 @@
         enemyBonus += stomped.length * 50;
         enemies = enemies.filter(enemy => !stomped.includes(enemy));
       }
-      if (enemies.some(collision)) endRun();
+      if (enemies.some(collision)) loseLife();
     }
     if (state === 'running') {
       coins = coins.filter(coin => {
@@ -239,7 +325,7 @@
   }
   function drawCloud(x, y, scale) {
     ctx.save(); ctx.translate(x, y); ctx.scale(scale, scale);
-    ctx.strokeStyle = colors.line; ctx.lineWidth = 2; ctx.beginPath();
+    ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2; ctx.beginPath();
     ctx.moveTo(-29, 12); ctx.bezierCurveTo(-38, 12, -38, -1, -26, -3);
     ctx.bezierCurveTo(-21, -20, 1, -23, 10, -8);
     ctx.bezierCurveTo(25, -13, 34, -2, 30, 9);
@@ -266,7 +352,12 @@
   }
   function drawPlayer() {
     const x = player.x - cameraX + 12, footY = groundY + player.y;
-    const moving = input.left !== input.right;
+    const hue = ((player.colorTime || 0) * 75) % 360;
+    const rainbow = ctx.createLinearGradient(x - 12, footY - 58, x + 12, footY);
+    rainbow.addColorStop(0, `hsl(${hue}, 80%, 58%)`);
+    rainbow.addColorStop(.5, `hsl(${(hue + 90) % 360}, 80%, 58%)`);
+    rainbow.addColorStop(1, `hsl(${(hue + 180) % 360}, 80%, 58%)`);
+    const moving = state === 'running';
     const walking = player.grounded && moving && state !== 'ready';
     const facing = player.facing || 1;
     const phase = ((player.runTime / .22) % 1 + 1) % 1;
@@ -288,12 +379,12 @@
       line(kneeX, kneeY, footX, ankleY, stroke);
       line(footX, ankleY, footX + facing * 4, ankleY, stroke, 3);
     }
-    drawLeg(.5, -7, '#777e78');
-    ctx.fillStyle = colors.ink; ctx.beginPath(); ctx.arc(x, footY - 49, 8, 0, Math.PI * 2); ctx.fill();
-    line(x, footY - 40, x, footY - 19);
-    line(x, footY - 34, x - 11 + swing * .5, footY - 23, colors.ink, 3.5);
-    line(x, footY - 34, x + 11 - swing * .5, footY - 23, colors.ink, 3.5);
-    drawLeg(0, 7, colors.ink);
+    drawLeg(.5, -7, rainbow);
+    ctx.fillStyle = rainbow; ctx.beginPath(); ctx.arc(x, footY - 49, 8, 0, Math.PI * 2); ctx.fill();
+    line(x, footY - 40, x, footY - 19, rainbow);
+    line(x, footY - 34, x - 11 + swing * .5, footY - 23, rainbow, 3.5);
+    line(x, footY - 34, x + 11 - swing * .5, footY - 23, rainbow, 3.5);
+    drawLeg(0, 7, rainbow);
   }
   function drawEnemy(enemy) {
     ctx.save();
@@ -325,8 +416,12 @@
   }
   function draw() {
     ctx.clearRect(0, 0, width, height);
-    ctx.fillStyle = '#fbfaf5'; ctx.fillRect(0, 0, width, height);
-    ctx.fillStyle = colors.pale; ctx.beginPath(); ctx.arc(width * .78 - cameraX * .08, height * .3, 44, 0, Math.PI * 2); ctx.fill();
+    const sky = ctx.createLinearGradient(0, 0, 0, groundY);
+    sky.addColorStop(0, '#79c5f2');
+    sky.addColorStop(1, '#d5efff');
+    ctx.fillStyle = sky; ctx.fillRect(0, 0, width, height);
+    ctx.fillStyle = '#fbfaf5'; ctx.fillRect(0, groundY, width, height - groundY);
+    ctx.fillStyle = '#fff2b5'; ctx.beginPath(); ctx.arc(width * .78 - cameraX * .08, height * .3, 44, 0, Math.PI * 2); ctx.fill();
     for (const cloud of clouds) {
       const cloudX = ((cloud.x - cameraX * .12) % (width + 130) + width + 130) % (width + 130) - 50;
       drawCloud(cloudX, cloud.y, cloud.scale);
@@ -335,7 +430,7 @@
     for (const ledge of ledges) {
       if (ledge.x + ledge.width < cameraX || ledge.x > cameraX + width) continue;
       const x = ledge.x - cameraX, y = groundY - ledge.height;
-      ctx.fillStyle = '#90b6a0';
+      ctx.fillStyle = ledge.upper ? '#9a9bd4' : '#90b6a0';
       ctx.fillRect(x, y, ledge.width, 12);
       ctx.strokeStyle = colors.ink; ctx.lineWidth = 2;
       ctx.strokeRect(x, y, ledge.width, 12);
@@ -356,17 +451,54 @@
     for (const enemy of enemies) if (enemy.x + enemy.width >= cameraX && enemy.x <= cameraX + width) drawEnemy(enemy);
     ctx.fillStyle = colors.line;
     for (const particle of particles) ctx.fillRect(particle.x - cameraX, particle.y, 4, 4);
+    if (invulnerable > 0) {
+      const x = player.x - cameraX + 12;
+      const y = groundY + player.y - 29;
+      ctx.save();
+      const rainbow = ctx.createLinearGradient(x - 30, y - 40, x + 30, y + 40);
+      ['#ff5263', '#ffab40', '#ffe35a', '#64df84', '#49cfff', '#8d77ff', '#ef83e8'].forEach((color, index) => rainbow.addColorStop(index / 6, color));
+      ctx.beginPath(); ctx.ellipse(x, y, 32, 40, 0, 0, Math.PI * 2);
+      ctx.globalAlpha = .16;
+      ctx.fillStyle = rainbow; ctx.fill();
+      ctx.globalAlpha = .9;
+      ctx.strokeStyle = rainbow; ctx.lineWidth = 4;
+      ctx.shadowColor = '#82cfff'; ctx.shadowBlur = 12;
+      ctx.stroke();
+      ctx.restore();
+    }
     drawPlayer();
   }
   function frame(timestamp) {
-    const dt = Math.min((timestamp - (lastFrame || timestamp)) / 1000, .032);
+    const elapsed = (timestamp - (lastFrame || timestamp)) / 1000;
+    const dt = state === 'countdown' ? elapsed : Math.min(elapsed, .032);
     lastFrame = timestamp;
     update(dt);
     draw();
     requestAnimationFrame(frame);
   }
 
+  const speedLevels = { easy: .7, medium: .85, hard: 1 };
+  function setLevelButtonsLocked(locked) {
+    for (const level of Object.keys(speedLevels)) {
+      const button = document.querySelector(`#speed-${level}`);
+      button.disabled = locked;
+      button.title = locked ? 'Choose a level before your next run' : '';
+    }
+  }
+  for (const [level, multiplier] of Object.entries(speedLevels)) {
+    document.querySelector(`#speed-${level}`).addEventListener('click', () => {
+      if (state !== 'ready' && state !== 'over') return;
+      selectedLevel = level;
+      speedMultiplier = multiplier;
+      showBest();
+      for (const name of Object.keys(speedLevels)) {
+        document.querySelector(`#speed-${name}`).setAttribute('aria-pressed', String(name === level));
+      }
+    });
+  }
+
   document.addEventListener('keydown', event => {
+    if (['ArrowLeft', 'KeyA'].includes(event.code)) { event.preventDefault(); return; }
     const direction = { ArrowLeft: 'left', KeyA: 'left', ArrowRight: 'right', KeyD: 'right' }[event.code];
     if (direction) {
       event.preventDefault();
@@ -405,6 +537,6 @@
   document.addEventListener('visibilitychange', () => { if (document.hidden && state === 'running') pause(); });
   window.addEventListener('blur', () => { input.left = false; input.right = false; if (state === 'running') pause(); });
   new ResizeObserver(resize).observe(stage);
-  bestDisplay.textContent = formatScore(best);
+  showBest();
   requestAnimationFrame(frame);
 })();

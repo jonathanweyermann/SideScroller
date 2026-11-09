@@ -1,4 +1,4 @@
-# Stickman Sprint
+# Rainbow Run
 
 A dependency-free side scroller for the browser.
 
